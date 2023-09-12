@@ -6,6 +6,7 @@ package compactv2
 import (
 	"context"
 
+	"github.com/go-kit/log/level"
 	"github.com/pkg/errors"
 	"github.com/prometheus/prometheus/model/histogram"
 	"github.com/prometheus/prometheus/model/labels"
@@ -41,8 +42,10 @@ func (s *lazyPopulateChunkSeriesSet) Next() bool {
 			if errors.Cause(err) == storage.ErrNotFound {
 				continue
 			}
-			s.err = errors.Wrapf(err, "get series %d", s.all.At())
-			return false
+			//s.err = errors.Wrapf(err, "get series %d", s.all.At())
+			//return false
+			// FIXME: This is to be able to read index with some bytes ranges missing in it
+			continue
 		}
 
 		if len(s.bufChks) == 0 {
@@ -190,6 +193,19 @@ func (w *Compactor) write(ctx context.Context, symbols index.StringIter, populat
 		for chksIter.Next() {
 			// We are not iterating in streaming way over chunk as it's more efficient to do bulk write for index and
 			// chunk file purposes.
+
+			// check, if we can read data from chunk
+			cm := chksIter.At()
+			if lazyChunk, ok := cm.Chunk.(*lazyPopulatableChunk); ok {
+				if lazyChunk.populated == nil {
+					lazyChunk.populate()
+				}
+				if lazyChunk.populated == nil {
+					// we can't read data. skip the chunk
+					level.Warn(w.logger).Log("msg", "skip bad chunk", "labels", s.Labels().String(), "startts", cm.MinTime/1000, "endts", cm.MaxTime/1000)
+					continue
+				}
+			}
 			chks = append(chks, chksIter.At())
 		}
 

@@ -705,6 +705,10 @@ func (it *ApplyCounterResetsSeriesIterator) Err() error {
 	return it.chks[it.i].Err()
 }
 
+func (it *ApplyCounterResetsSeriesIterator) LastV() float64 {
+	return it.lastV
+}
+
 // AverageChunkIterator emits an artificial series of average samples based in aggregate
 // chunks with sum and count aggregates.
 type AverageChunkIterator struct {
